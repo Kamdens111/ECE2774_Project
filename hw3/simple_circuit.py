@@ -1,6 +1,5 @@
 #Simple Circuit
 
-import numpy as nd
 import numpy as np
 
 #create inputs

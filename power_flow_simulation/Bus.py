@@ -4,12 +4,19 @@ import numpy as np
 # bus name
 # create power system class
 
-global bus_count
-bus_count = 0
-
 class Bus:
-    def __init__(self, number, name, voltage):
-        self.voltage = voltage
-        self.number = number
+    bus_count = 0
+
+    def __init__(self, name, voltage_base):
+        self.voltage_base = voltage_base
         self.name = name
-        bus_count += 1
+        self.number = Bus.bus_count
+
+        self.v = None
+        Bus.bus_count += 1
+
+    def set_bus_voltage(self, bus_v):
+        self.v=bus_v
+
+    def show_bus_count(self):
+        print(self.bus_count)

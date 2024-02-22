@@ -12,6 +12,7 @@ class Transformer:
         self.x_r_ratio = x_r_ratio
         self.busA = busA
         self.busB = busB
+        self.y_bus = np.zeros(2)
 
         self.buses = [self.busA, self.busB]
         self.__calc_params()
@@ -23,9 +24,14 @@ class Transformer:
         Z_pu_old = (self.percent_z/100)*np.exp(1j*np.arctan(self.x_r_ratio))
         # Z_sys_base = np.power(self.busB.voltage_base, 2)/s.S_mva  # fix this
         # Z_tx_base = np.power(self.high_v, 2)/self.tx_power_rating
-        Z_pu_new = Z_pu_old*(s.S_mva/self.x_r_ratio)
+        Z_pu_new = Z_pu_old*(s.S_mva/self.tx_power_rating)
         self.R = np.real(Z_pu_new)
         self.X = np.imag(Z_pu_new)
+        Z = self.R + 1j*self.X
+        Y = 1/Z
+
+        # calculate y_bus for this system
+        self.y_bus = np.array([[Y, -Y], [-Y, Y]])
 
     # show calculated r and x
     def show_params(self):

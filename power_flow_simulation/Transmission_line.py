@@ -17,6 +17,7 @@ class Transmission_line:
         self.num_conductors = num_conductors
         self.busA = busA
         self.busB = busB
+        self.y_bus = np.zeros(2)
         self.__calc_params()
 
     def __calc_params(self):
@@ -32,6 +33,12 @@ class Transmission_line:
         self.X = X_prime*self.line_length
         self.G = G_prime*self.line_length
         self.B = B_prime*self.line_length
+        Z = self.R + 1j*self.X
+        Y_s = 1/Z
+        Y_p = 1/(self.G + 1j*self.B)
+        Y_tot = Y_s + Y_p/2
+
+        self.Y_p = np.array([[Y_tot, -1*Y_s], [-1*Y_s, Y_tot]])
 
     def show_params(self):
         print("R = ", self.R, "Ohms")
@@ -40,6 +47,3 @@ class Transmission_line:
         print("B = ", self.B, "S")
 
 
-if __name__ == "__main__":
-    tline_obj = Transmission_line(.0435, 1, 12.5, 12.5, 20, 1, 2, 1.293, .0969, 1, 2)
-    tline_obj.show_params()

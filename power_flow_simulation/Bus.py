@@ -7,12 +7,10 @@ import numpy as np
 class Bus:
     bus_count = 0
 
-    def __init__(self, name, voltage_base):
-        self.voltage_base = voltage_base
+    def __init__(self, name, nominal_voltage):
+        self.voltage_base = nominal_voltage
         self.name = name
-        self.number = Bus.bus_count
         self.bus_number = Bus.bus_count
-
 
         self.v = None
         Bus.bus_count += 1

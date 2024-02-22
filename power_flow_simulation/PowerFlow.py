@@ -1,6 +1,6 @@
 from Bus import Bus
 from Transformer import Transformer
-from Transmission_line import Transmission_line
+from TransmissionLine import TransmissionLine
 from typing import Dict, List, Optional
 from Settings import s
 
@@ -15,7 +15,7 @@ class PowerFlow:
         self.buses: Dict[str, Bus] = dict()
 
         self.transformers: Dict[str, Transformer] = dict()
-        self.transmissionLines: Dict[str, Transmission_line] = dict()
+        self.transmissionLines: Dict[str, TransmissionLine] = dict()
 
 
     def add_bus(self, bus_name: str, bus_voltage):

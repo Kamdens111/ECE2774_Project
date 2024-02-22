@@ -14,4 +14,4 @@ class Settings:
         return self._f
 
 
-s=Settings()
+s = Settings()

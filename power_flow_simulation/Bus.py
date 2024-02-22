@@ -16,7 +16,7 @@ class Bus:
         Bus.bus_count += 1
 
     def set_bus_voltage(self, bus_v):
-        self.v=bus_v
+        self.v = bus_v
 
     def show_bus_count(self):
         print(self.bus_count)

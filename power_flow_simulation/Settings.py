@@ -2,8 +2,8 @@
 #fix this later
 class Settings:
     def __init__(self):
-        self._S_mva=100e6
-        self._f=60
+        self._S_mva = 100e6
+        self._f = 60
 
     @property
     def S_mva(self):

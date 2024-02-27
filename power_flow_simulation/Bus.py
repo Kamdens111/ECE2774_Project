@@ -20,3 +20,6 @@ class Bus:
 
     def show_bus_number(self):
         print(self.bus_number)
+
+    def show_bus_count(self):
+        print(Bus.bus_count)

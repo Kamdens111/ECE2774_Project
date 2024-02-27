@@ -24,17 +24,36 @@ class TransmissionLine:
         self.X = X_prime*self.line_length
         self.G = G_prime*self.line_length
         self.B = B_prime*self.line_length
+        self.get_bus_admittance()
+
+    def get_Z_pu(self):
+        return (self.R + 1j*self.X)/(self.busA.voltage_base**2 / s.S_mva)
+
+    def get_Y_pu(self):
+        return (self.G + 1j*self.B)/(s.S_mva/self.busA.voltage_base**2)
+
+    def get_series_admittance(self):
         Z = self.R + 1j*self.X
-        Y_s = 1/Z
-        Y_p = 1/(self.G + 1j*self.B)
+
+        Z_base = self.busA.voltage_base ** 2 / s.S_mva
+        return 1/(Z/Z_base)  #series admittance
+
+    def get_shunt_admittance(self):
+        Y = self.G + 1j * self.B
+        Z_base = self.busA.voltage_base ** 2 / s.S_mva
+        Y_base = 1 / Z_base
+        return Y / Y_base  # parallel/shunt admittance
+
+    def get_bus_admittance(self):
+        Y_s = self.get_series_admittance()
+        Y_p = self.get_shunt_admittance()
         Y_tot = Y_s + Y_p/2
+        self.y_bus = np.array([[Y_tot, -1 * Y_s], [-1 * Y_s, Y_tot]])
 
-        self.y_bus = np.array([[Y_tot, -1*Y_s], [-1*Y_s, Y_tot]])
-
-    def show_params(self):
-        print("R = ", self.R, "Ohms")
-        print("X = ", self.X, "Ohms")
-        print("G = ", self.G, "S")
-        print("B = ", self.B, "S")
+    def show_pu_values(self):
+        print("R = ", np.real(self.get_Z_pu()), "pu")
+        print("X = ", np.imag(self.get_Z_pu()), "pu")
+        print("G = ", np.real(self.get_Y_pu()), "pu")
+        print("B = ", np.imag(self.get_Y_pu()), "pu")
 
 

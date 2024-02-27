@@ -2,7 +2,9 @@ import Geometry as Geometry
 import numpy as np
 import sys
 
+
 class Conductor:
+
     def __init__(self, GMR, R_c, d_conductor, geometry: Geometry):
         self.GMR = GMR
         self.R_c = R_c

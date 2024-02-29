@@ -33,6 +33,9 @@ class Transformer:
         # calculate y_bus for this system
         self.y_bus = np.array([[Y, -Y], [-Y, Y]])
 
+    def get_bus_admittance(self):
+        return self.y_bus
+
     # show calculated r and x
     def show_params(self):
         print("R = ", self.R, "pu")

@@ -4,7 +4,9 @@ import numpy as np
 # bus name
 # create power system class
 
+
 class Bus:
+
     bus_count = 0
 
     def __init__(self, name, nominal_voltage):

@@ -35,5 +35,5 @@ class Transformer:
 
     # show calculated r and x
     def show_params(self):
-        print("R = ", self.R, "Ohms")
-        print("X = ", self. X, "Ohms")
+        print("R = ", self.R, "pu")
+        print("X = ", self. X, "pu")

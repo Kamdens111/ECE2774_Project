@@ -28,8 +28,8 @@ class Conductor:
             self.D_sl = np.cbrt(self.geometry.conductor_distance**2 * self.GMR)
             self.D_sc = np.cbrt(self.geometry.conductor_distance**2 * r)
         elif self.geometry.num_conductors == 4:
-            self.D_sl = np.power(self.geometry.conductor_distance**3 * self.GMR, 1/4)
-            self.D_sc = np.power(self.geometry.conductor_distance**3 * r, 1/4)
+            self.D_sl = 1.091*np.power(self.geometry.conductor_distance**3 * self.GMR, 1/4)
+            self.D_sc = 1.091*np.power(self.geometry.conductor_distance**3 * r, 1/4)
         else:
             print("Error: Too many conductors in bundle")
             sys.exit()

@@ -2,11 +2,12 @@ import numpy as np
 import Bus as Bus
 from Settings import s
 import Conductor as Conductor
+import pandas as pd
 
 
 class TransmissionLine:
 
-    def __init__(self, line_length, conductor: Conductor, busA: Bus, busB: Bus):
+    def __init__(self, line_length, conductor: Conductor, busA: Bus, busB: Bus): #add name
         self.line_length = line_length
         self.conductor = conductor
         self.busA = busA
@@ -24,7 +25,13 @@ class TransmissionLine:
         self.X = X_prime*self.line_length
         self.G = G_prime*self.line_length
         self.B = B_prime*self.line_length
-        self.get_bus_admittance()
+
+        Y_s = self.get_series_admittance()
+        Y_p = self.get_shunt_admittance()
+        Y_tot = Y_s + Y_p / 2
+        prim_y = np.array([[Y_tot, -1 * Y_s], [-1 * Y_s, Y_tot]])
+        self.y_bus = pd.DataFrame(prim_y, [self.busA.name, self.busB.name], [self.busA.name, self.busB.name],
+                                  dtype=complex)
 
     def get_Z_pu(self):
         return (self.R + 1j*self.X)/(self.busA.voltage_base**2 / s.S_mva)
@@ -45,10 +52,7 @@ class TransmissionLine:
         return Y / Y_base  # parallel/shunt admittance
 
     def get_bus_admittance(self):
-        Y_s = self.get_series_admittance()
-        Y_p = self.get_shunt_admittance()
-        Y_tot = Y_s + Y_p/2
-        self.y_bus = np.array([[Y_tot, -1 * Y_s], [-1 * Y_s, Y_tot]])
+        return self.y_bus
 
     def show_pu_values(self):
         print("R = ", np.real(self.get_Z_pu()), "pu")

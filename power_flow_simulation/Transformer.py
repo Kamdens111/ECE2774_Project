@@ -6,7 +6,7 @@ import pandas as pd
 
 class Transformer:
     # constructor
-    def __init__(self, tx_power_rating, percent_z, x_r_ratio, busA: Bus, busB: Bus):
+    def __init__(self, tx_power_rating, percent_z, x_r_ratio, busA: Bus, busB: Bus): #add name
         self.tx_power_rating = tx_power_rating
         self.percent_z = percent_z
         self.x_r_ratio = x_r_ratio
@@ -31,7 +31,8 @@ class Transformer:
         Y = 1/Z
 
         # calculate y_bus for this system
-        self.y_bus = np.array([[Y, -Y], [-Y, Y]])
+        prim_y = np.array([[Y, -Y], [-Y, Y]])  # change to pandas
+        self.y_bus = pd.DataFrame(prim_y, [self.busA.name, self.busB.name], [self.busA.name, self.busB.name], dtype=complex)
 
     def get_bus_admittance(self):
         return self.y_bus

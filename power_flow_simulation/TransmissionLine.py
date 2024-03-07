@@ -25,6 +25,12 @@ class TransmissionLine:
         self.X = X_prime*self.line_length
         self.G = G_prime*self.line_length
         self.B = B_prime*self.line_length
+        zbase = self.busA.voltage_base ** 2 / s.S_mva
+        ybase = 1/zbase
+
+        Rpu = self.R/zbase
+        Xpu = self.X/zbase
+        Bpu = self.B/ybase
 
         Y_s = self.get_series_admittance()
         Y_p = self.get_shunt_admittance()

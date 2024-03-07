@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 from Bus import Bus
 from Transformer import Transformer
 from TransmissionLine import TransmissionLine
@@ -41,5 +44,31 @@ class PowerFlow:
         self.transmissionLines[name] = TransmissionLine(line_length, self.conductors[conductor_name], self.buses[busA],
                                                         self.buses[busB])
 
-    def calc_y_bus(self):
-        return
+    def get_y_bus(self):
+        size = (len(self.buses), len(self.buses))
+        d = np.zeros(size)
+        self.final_y_bus = pd.DataFrame(data=d, index=self.buses_order, columns=self.buses_order, dtype=complex)
+        # add transformer ybuses
+        for x in self.transformers.keys():
+            self.final_y_bus.loc[self.transformers[x].busA.name, self.transformers[x].busA.name] += (
+                self.transformers[x].y_bus.loc)[self.transformers[x].busA.name, self.transformers[x].busA.name]
+            self.final_y_bus.loc[self.transformers[x].busB.name, self.transformers[x].busB.name] += (
+                self.transformers[x].y_bus.loc)[self.transformers[x].busB.name, self.transformers[x].busB.name]
+            self.final_y_bus.loc[self.transformers[x].busA.name, self.transformers[x].busB.name] += (
+                self.transformers[x].y_bus.loc)[self.transformers[x].busA.name, self.transformers[x].busB.name]
+            self.final_y_bus.loc[self.transformers[x].busB.name, self.transformers[x].busA.name] += (
+                self.transformers[x].y_bus.loc)[self.transformers[x].busB.name, self.transformers[x].busA.name]
+
+        #add tline ybuses
+        for x in self.transmissionLines.keys():
+            self.final_y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busA.name] += (
+                self.transmissionLines[x].y_bus.loc)[self.transmissionLines[x].busA.name, self.transmissionLines[x].busA.name]
+            self.final_y_bus.loc[self.transmissionLines[x].busB.name, self.transmissionLines[x].busB.name] += (
+                self.transmissionLines[x].y_bus.loc)[self.transmissionLines[x].busB.name, self.transmissionLines[x].busB.name]
+            self.final_y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busB.name] += (
+                self.transmissionLines[x].y_bus.loc)[self.transmissionLines[x].busA.name, self.transmissionLines[x].busB.name]
+            self.final_y_bus.loc[self.transmissionLines[x].busB.name, self.transmissionLines[x].busA.name] += (
+                self.transmissionLines[x].y_bus.loc)[self.transmissionLines[x].busB.name, self.transmissionLines[x].busA.name]
+
+        return self.final_y_bus
+

@@ -121,7 +121,7 @@ class PowerFlow:
                     q = 0
                     for p in self.buses:
 
-                        if self.buses[p].bus_number == k:
+                        if self.buses[p].bus_number == k+1:
                             q += 1
                             continue
                         temp += np.abs(self.final_y_bus.loc[a, p]) * np.abs(V[q]) * np.sin(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_y_bus.loc[a, p]))
@@ -130,7 +130,7 @@ class PowerFlow:
                 n += 1
 
             k += 1
-        return J1
+        return J1.to_numpy()
 
     def calc_j2(self, V):
 
@@ -158,26 +158,19 @@ class PowerFlow:
                 if self.buses[b].bus_number in slack_position or self.buses[b].bus_number in pv_positions:
                     continue
                 if k != n:
-                    J2.loc[k, n] = (np.abs(V[k]) * np.abs(self.final_y_bus.loc[a, b]) * np.abs(V[n])
-                                    * np.sin(np.angle(V[k]) - np.angle(V[n])
-                                             - np.angle(self.final_y_bus.loc[a, b])))
+                    J2.loc[k, n] = np.abs(V[k]) * np.abs(self.final_y_bus.loc[a, b]) * np.cos(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_y_bus.loc[a, b]))
 
                 else:
                     temp: float = 0
                     q = 0
                     for p in self.buses:
-
-                        if p == k:
-                            continue
-                        temp += np.abs(self.final_y_bus.loc[a, p]) * np.abs(V[q]) * np.sin(np.angle(V[k])
-                                                                                           - np.angle(V[q]) - np.angle(
-                            self.final_y_bus.loc[a, p]))
+                        temp += np.abs(self.final_y_bus.loc[a, p]) * np.abs(V[q]) * np.cos(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_y_bus.loc[a, p]))
                         q += 1
-                    J2.loc[k, n] = -1 * np.abs(V[k]) * temp
+                    J2.loc[k, n] = np.abs(V[k]) * np.abs(self.final_y_bus.loc[a, a]) * np.cos(np.angle(self.final_y_bus.loc[a, a])) + temp
                 n += 1
 
             k += 1
-        return J2
+        return J2.to_numpy()
 
     def calc_j3(self, V):
         # determine which is slack bus
@@ -195,7 +188,33 @@ class PowerFlow:
         d = np.zeros(size)
         J3 = pd.DataFrame(data=d, dtype=float)
 
-        return J3
+        k = 0
+
+        for a in self.buses:
+            if self.buses[a].bus_number in slack_position or self.buses[a].bus_number in pv_positions:
+                continue
+            n = 0
+            for b in self.buses:
+                if self.buses[b].bus_number in slack_position:
+                    continue
+                if k != n:
+                    J3.loc[k, n] = -1 * np.abs(V[k]) * np.abs(self.final_y_bus.loc[a, b]) * np.abs(V[n]) * np.cos(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_y_bus.loc[a, b]))
+
+                else:
+                    temp: float = 0
+                    q = 0
+                    for p in self.buses:
+                        if self.buses[p].bus_number == k+1:
+                            q += 1
+                            continue
+                        temp += np.abs(self.final_y_bus.loc[a, p]) * np.abs(V[q]) * np.cos(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_y_bus.loc[a, p]))
+                        q += 1
+                    J3.loc[k, n] = np.abs(V[k]) * temp
+                n += 1
+
+            k += 1
+
+        return J3.to_numpy()
 
     def calc_j4(self, V):
         # determine which is slack bus
@@ -212,10 +231,31 @@ class PowerFlow:
         size = (len(self.buses) - 1 - len(pv_positions), len(self.buses) - 1 - len(pv_positions))
         d = np.zeros(size)
         J4 = pd.DataFrame(data=d, dtype=float)
+        k = 0
+        for a in self.buses:
+            if self.buses[a].bus_number in slack_position or self.buses[a].bus_number in pv_positions:
+                continue
+            n = 0
+            for b in self.buses:
+                if self.buses[b].bus_number in slack_position or self.buses[b].bus_number in pv_positions:
+                    continue
+                if k != n:
+                    J4.loc[k, n] = np.abs(V[k]) * np.abs(self.final_y_bus.loc[a, b]) * np.sin(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_y_bus.loc[a, b]))
 
-        return J4
+                else:
+                    temp: float = 0
+                    q = 0
+                    for p in self.buses:
+                        temp += np.abs(self.final_y_bus.loc[a, p]) * np.abs(V[q]) * np.sin(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_y_bus.loc[a, p]))
+                        q += 1
+                    J4.loc[k, n] = -1 * np.abs(V[k]) * np.abs(self.final_y_bus.loc[a, a]) * np.sin(np.angle(self.final_y_bus.loc[a, a])) + temp
+                n += 1
 
-    def calc_jacobian(self, J1: pd.DataFrame, J2: pd.DataFrame, J3, J4):
+            k += 1
+        return J4.to_numpy()
+
+
+    def calc_jacobian(self, J1, J2, J3, J4):
         iterator = 0
         slack_position: List[int] = list()
         pv_positions: List[int] = list()
@@ -225,19 +265,17 @@ class PowerFlow:
             elif self.buses[c].bus_type == "PV":
                 pv_positions.extend([iterator])
             iterator += 1
-        #J_temp = [[J1, J2], [J3, J4]]
-        #pd.concat([J1, J2], axis=1, ignore_index=True)
-        size = (len(self.buses)-1 + len(self.buses) - 1 - len(pv_positions), len(self.buses)-1 + + len(self.buses) - 1 - len(pv_positions))
-        d = np.zeros(size)
-
-        J = pd.DataFrame(data=d, index=range(size[0]), columns=range(size[1]), dtype=float)
+        j12 = np.hstack([J1, J2])
+        j23 = np.hstack([J3, J4])
+        J = np.vstack([j12, j23])
         return J
 
 
 
 
     def simulate(self):
-        #initialize bus voltages to 0 except for slack and pv buses
+        self.get_y_bus()
+        #initialize bus voltages to 1<0 deg
         V = pd.array(data=np.zeros(len(self.buses)), dtype=complex)
         a = 0
         for i in self.buses:

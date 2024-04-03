@@ -26,8 +26,7 @@ sim1.add_transmissionLine("tline6", 35, "Partridge", "bus4", "bus5")
 #add transformer
 sim1.add_transformer("T2", 200e6, 10.5, 12, "bus6", "bus7")
 
-#calc ybus
-sim1.get_y_bus()
+
 sim1.simulate()
 
 

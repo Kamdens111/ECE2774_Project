@@ -14,7 +14,7 @@ sim1.add_bus("bus3", 230e3)
 sim1.add_bus("bus4", 230e3)
 sim1.add_bus("bus5", 230e3)
 sim1.add_bus("bus6", 230e3)
-sim1.add_bus("bus7", 18e3, "PV", 1.00, 2)
+sim1.add_bus("bus7", 18e3, "PV", 1.00)
 
 sim1.add_transmissionLine("tline1", 10, "Partridge", "bus2", "bus4")
 sim1.add_transmissionLine("tline2", 25, "Partridge", "bus2", "bus3")
@@ -25,6 +25,15 @@ sim1.add_transmissionLine("tline6", 35, "Partridge", "bus4", "bus5")
 
 #add transformer
 sim1.add_transformer("T2", 200e6, 10.5, 12, "bus6", "bus7")
+
+sim1.add_generator("G1", "bus1")
+sim1.add_generator("G2", "bus7", 200e6)
+
+sim1.add_load("load1", "bus2", 0, 0)
+sim1.add_load("load2", "bus3", 110e6, 50e6)
+sim1.add_load("load3", "bus4", 100e6, 70e6)
+sim1.add_load("load4", "bus5", 100e6, 65e6)
+sim1.add_load("load5", "bus6", 0, 0)
 
 
 sim1.simulate()

@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from Generator import Generator
+from Load import Load
 from Bus import Bus
 from Transformer import Transformer
 from TransmissionLine import TransmissionLine
@@ -24,10 +26,12 @@ class PowerFlow:
         self.transmissionLines: Dict[str, TransmissionLine] = dict()
         self.geometry: Dict[str, Geometry] = dict()
         self.conductors: Dict[str, Conductor] = dict()
+        self.generators: Dict[str, Generator] = dict()
+        self.loads: Dict[str, Load] = dict()
 
-    def add_bus(self, bus_name: str, bus_voltage, bus_type: str = "none", v_mag = 1, Pg = None):
+    def add_bus(self, bus_name: str, bus_voltage, bus_type: str = "none", v_mag=1):
         if bus_name not in self.buses.keys():
-            self.buses[bus_name] = Bus(bus_name, bus_voltage, bus_type, v_mag, Pg)
+            self.buses[bus_name] = Bus(bus_name, bus_voltage, bus_type, v_mag)
             self.buses_order.append(bus_name)
 
     def add_transformer(self, name, power_rating, percent_z, x_r_ratio,  busA: str, busB: str,):
@@ -43,6 +47,12 @@ class PowerFlow:
     def add_transmissionLine(self, name, line_length, conductor_name: str, busA: str, busB: str):
         self.transmissionLines[name] = TransmissionLine(line_length, self.conductors[conductor_name], self.buses[busA],
                                                         self.buses[busB])
+
+    def add_generator(self, name: str, bus: str, P=s.S_mva):
+        self.generators[name] = Generator(name, bus, P)
+
+    def add_load(self, name: str, bus: str, P, Q):
+        self.loads[name] = Load(name, bus, P, Q)
 
     def get_y_bus(self):
         size = (len(self.buses), len(self.buses))
@@ -75,6 +85,13 @@ class PowerFlow:
     def calc_mismatch(self, V):
         #calc size of y array
         #assuming one slack find number of PV busses
+        #make voltage vector with [ v delta ]
+        full_voltage = np.zeros(2*len(V))
+        iterator = 0
+        for x in self.buses:
+            full_voltage[iterator] = self.buses[x].v_angle
+            full_voltage[iterator + len(self.buses)] = self.buses[x].v_mag
+            iterator += 1
         iterator = 0
         slack_position: List[int] = list()
         pv_positions: List[int] = list()
@@ -86,11 +103,93 @@ class PowerFlow:
             iterator += 1
         size = 2*len(self.buses)-2 - len(pv_positions)
         mismatch = np.zeros(size, dtype=float)
-        return
+        f_calc = np.zeros(len(self.buses)*2)
 
-    def calc_solution(self, y, J):
-        size = 2*len(self.buses)
-        solution = np.zeros(size, dtype=float)
+        #start calculating real power
+        k = 0
+        for a in self.buses:
+            n = 0
+            temp = 0
+            for b in self.buses:
+                temp += np.abs(self.final_y_bus.loc[a, b]) * np.abs(V[n]) * np.cos(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_y_bus.loc[a, b]))
+                n += 1
+            f_calc[k] = np.abs(V[k]) * temp
+            k += 1
+        #calc for vars
+        k = 0
+        for a in self.buses:
+            n = 0
+            temp = 0
+            for b in self.buses:
+                temp += np.abs(self.final_y_bus.loc[a, b]) * np.abs(V[n]) * np.sin(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_y_bus.loc[a, b]))
+                n += 1
+            f_calc[k + len(self.buses)] = np.abs(V[k]) * temp
+            k += 1
+
+
+        #make known power vector for comparison
+        f = np.zeros(len(self.buses) * 2)
+        k = 0
+        for x in self.buses:
+            for y in self.generators:
+                if x == self.generators[y].bus:
+                    f[k] = self.generators[y].P
+            for z in self.loads:
+                if x == self.loads[z].bus:
+                    f[k] = -1 * self.loads[z].P
+                    f[k + len(self.buses)] = -1 * self.loads[z].Q
+            k += 1
+        temp_mismatch = f - f_calc
+        sp_size = len(slack_position)
+        for k in slack_position:
+            slack_position.extend([k + len(self.buses)])
+            if len(slack_position) >= 2*sp_size:
+                break
+        pv_size = len(pv_positions)
+        #delte unwanted power rows
+        for k in range (len(f)-1, -1, -1):
+            if k in slack_position or k in pv_positions:
+                temp_mismatch = np.delete(temp_mismatch, k)
+        mismatch = temp_mismatch
+
+        return mismatch
+
+    def calc_solution(self, y, J, V):
+        #solve for delta x
+        delt_x = np.linalg.solve(J, y)
+
+        #assign new bus voltages
+        iterator = 0
+        slack_position: List[int] = list()
+        pv_positions: List[int] = list()
+        for c in self.buses:
+            if self.buses[c].bus_type == "slack":
+                slack_position.extend([iterator])
+            elif self.buses[c].bus_type == "PV":
+                pv_positions.extend([iterator])
+            iterator += 1
+
+        i = 0
+        for x in self.buses:
+            if self.buses[x].bus_type == "slack":
+                continue
+            else:
+                self.buses[x].set_bus_voltage_angle(self.buses[x].v_angle + delt_x[i])
+                i += 1
+
+        for x in self.buses:
+            if self.buses[x].bus_type == "slack" or self.buses[x].bus_type == "PV":
+                continue
+            else:
+                self.buses[x].set_bus_voltage_mag(self.buses[x].v_mag + delt_x[i])
+
+        a = 0
+        new_V = pd.array(data=np.zeros(len(self.buses)), dtype=complex)
+
+        for i in self.buses:
+            new_V[a] = self.buses[i].v_mag * np.exp(1j * self.buses[i].v_angle)
+            a += 1
+        return new_V
 
     def calc_j1(self, V):
         size = (len(self.buses) - 1, len(self.buses) - 1)
@@ -279,23 +378,38 @@ class PowerFlow:
         V = pd.array(data=np.zeros(len(self.buses)), dtype=complex)
         a = 0
         for i in self.buses:
-
             if self.buses[i].bus_type != "slack" and self.buses[i].bus_type != "PV":
                 self.buses[i].set_bus_voltage_mag(1)
             self.buses[i].set_bus_voltage_angle(0)
             V[a] = self.buses[i].v_mag * np.exp(1j*self.buses[i].v_angle)
             a += 1
-
-        y = self.calc_mismatch(V)
-        J1 = self.calc_j1(V)
-        J2 = self.calc_j2(V)
-        J3 = self.calc_j3(V)
-        J4 = self.calc_j4(V)
-        J = self.calc_jacobian(J1, J2, J3, J4)
-        x = self.calc_solution(y, J)
-
-
-
-
+        tolerance = 0.001
+        for i in range(50):
+            y = self.calc_mismatch(V)
+            count = 0
+            for k in range(len(y)):
+                if np.abs(y[k]) <= tolerance:
+                    count += 1
+            if count == len(y) or i == 49:
+                #create solution vector
+                print("Solution found")
+                v_solution = pd.array(data=np.zeros(len(self.buses)*2), dtype=float)
+                a = 0
+                for k in self.buses:
+                    v_solution[a] = np.rad2deg(self.buses[k].v_angle)
+                    v_solution[a + len(self.buses)] = self.buses[k].v_mag
+                    a += 1
+                print(v_solution)
+                break
+            J1 = self.calc_j1(V)
+            J2 = self.calc_j2(V)
+            J3 = self.calc_j3(V)
+            J4 = self.calc_j4(V)
+            J = self.calc_jacobian(J1, J2, J3, J4)
+            V = self.calc_solution(y, J, V)
 
         print("hi")
+
+
+
+

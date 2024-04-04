@@ -1,4 +1,5 @@
 import numpy as np
+from Settings import s
 
 # number of busses
 # bus name
@@ -10,13 +11,12 @@ class Bus:
     bus_count = 0
     slack_bus_count = 0
 
-    def __init__(self, name, nominal_voltage, bus_type: str = "PQ", v_mag: float = 1, Pg: float = None):
+    def __init__(self, name, nominal_voltage, bus_type: str = "PQ", v_mag: float = 1):
         self.voltage_base = nominal_voltage
         self.name = name
         self.bus_number = Bus.bus_count
         self.bus_type = bus_type
         self.v_mag = v_mag
-        self.P_inj = Pg
 
         #self.v_mag = None
         #self.v_angle = None

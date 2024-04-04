@@ -99,7 +99,7 @@ class PowerFlow:
             if self.buses[c].bus_type == "slack":
                 slack_position.extend([iterator])
             elif self.buses[c].bus_type == "PV":
-                pv_positions.extend([iterator])
+                pv_positions.extend([iterator + len(self.buses)])
             iterator += 1
         size = 2*len(self.buses)-2 - len(pv_positions)
         mismatch = np.zeros(size, dtype=float)
@@ -146,15 +146,19 @@ class PowerFlow:
             if len(slack_position) >= 2*sp_size:
                 break
         pv_size = len(pv_positions)
+        del_vector = None
+
+
+
         #delte unwanted power rows
-        for k in range (len(f)-1, -1, -1):
+        for k in range(len(f)-1, -1, -1):
             if k in slack_position or k in pv_positions:
                 temp_mismatch = np.delete(temp_mismatch, k)
         mismatch = temp_mismatch
 
         return mismatch
 
-    def calc_solution(self, y, J, V):
+    def calc_solution(self, y, J):
         #solve for delta x
         delt_x = np.linalg.solve(J, y)
 
@@ -182,6 +186,7 @@ class PowerFlow:
                 continue
             else:
                 self.buses[x].set_bus_voltage_mag(self.buses[x].v_mag + delt_x[i])
+                i += 1
 
         a = 0
         new_V = pd.array(data=np.zeros(len(self.buses)), dtype=complex)
@@ -203,6 +208,7 @@ class PowerFlow:
                 break
             slack_position += 1
         k = 0
+        skip_k = 0
         for a in self.buses:
             if self.buses[a].bus_number == slack_position:
                 continue
@@ -248,13 +254,16 @@ class PowerFlow:
         d = np.zeros(size)
         J2 = pd.DataFrame(data=d, dtype=float)
         k = 0
-
+        skip_k = 0
         for a in self.buses:
             if self.buses[a].bus_number in slack_position:
+                skip_k += 1
                 continue
             n = 0
+            skip_n = 0
             for b in self.buses:
                 if self.buses[b].bus_number in slack_position or self.buses[b].bus_number in pv_positions:
+                    skip_n += 1
                     continue
                 if k != n:
                     J2.loc[k, n] = np.abs(V[k]) * np.abs(self.final_y_bus.loc[a, b]) * np.cos(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_y_bus.loc[a, b]))
@@ -383,8 +392,8 @@ class PowerFlow:
             self.buses[i].set_bus_voltage_angle(0)
             V[a] = self.buses[i].v_mag * np.exp(1j*self.buses[i].v_angle)
             a += 1
-        tolerance = 0.001
-        for i in range(50):
+        tolerance = 0.0001
+        for i in range(500):
             y = self.calc_mismatch(V)
             count = 0
             for k in range(len(y)):
@@ -393,7 +402,7 @@ class PowerFlow:
             if count == len(y) or i == 49:
                 #create solution vector
                 print("Solution found")
-                v_solution = pd.array(data=np.zeros(len(self.buses)*2), dtype=float)
+                v_solution = pd.array(data=np.zeros(len(self.buses)*2))
                 a = 0
                 for k in self.buses:
                     v_solution[a] = np.rad2deg(self.buses[k].v_angle)
@@ -406,7 +415,7 @@ class PowerFlow:
             J3 = self.calc_j3(V)
             J4 = self.calc_j4(V)
             J = self.calc_jacobian(J1, J2, J3, J4)
-            V = self.calc_solution(y, J, V)
+            V = self.calc_solution(y, J)
 
         print("hi")
 

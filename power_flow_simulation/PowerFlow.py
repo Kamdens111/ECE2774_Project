@@ -424,7 +424,7 @@ class PowerFlow:
         for x in self.transmissionLines:
             self.transmissionLines[x].set_line_current(np.abs(V.loc[self.transmissionLines[x].busA.name, 0] * self.transmissionLines[x].y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busA.name] + V.loc[self.transmissionLines[x].busB.name, 0] * self.transmissionLines[x].y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busB.name]))
             #self.transmissionLines[x].set_line_current(np.abs((V.loc[self.transmissionLines[x].busA.name, 0] - V.loc[self.transmissionLines[x].busB.name, 0]) * self.transmissionLines[x].y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busA.name]))
-            if self.transmissionLines[x].conductor.current_limit <= self.transmissionLines[x].current:
+            if self.transmissionLines[x].conductor.current_limit <= self.transmissionLines[x].current * (s.S_mva/(np.sqrt(3) * self.transmissionLines[x].busA.voltage_base)):
                 print("WARNING: " + self.transmissionLines[x].name + " EXCEEDS AMPACITY LIMIT")
 
     def calc_power_flow(self, V):

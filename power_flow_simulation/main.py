@@ -1,4 +1,5 @@
 from PowerFlow import PowerFlow
+from Settings import s
 
 
 sim1 = PowerFlow("Sim")
@@ -8,7 +9,7 @@ sim1.add_transformer("T1", 125e6, 8.5, 10, "bus1", "bus2")
 
 #add tline parameters
 sim1.add_geometry("geo1", 19.5, 19.5, 39, 1.5, 2)
-sim1.add_conductor("Partridge", 0.0217, 0.385, 0.642, "geo1")
+sim1.add_conductor("Partridge", 0.0217, 0.385, 0.642, 460, "geo1")
 
 sim1.add_bus("bus3", 230e3)
 sim1.add_bus("bus4", 230e3)
@@ -35,22 +36,12 @@ sim1.add_load("load3", "bus4", 100e6, 70e6)
 sim1.add_load("load4", "bus5", 100e6, 65e6)
 sim1.add_load("load5", "bus6", 0, 0)
 
+V = sim1.simulate()
+sim1.calc_line_currents(V)
+flow = sim1.calc_power_flow(V) * s.S_mva
+line_losses = sim1.calc_line_losses()
+total_losses = sum(line_losses.to_numpy())
 
-sim1.simulate()
-
-
-
-#bus1 = Bus(0, 500e3)
-#bus2 = Bus(1, 500e3)
-#tx1 = Transformer(500e6, 7.5, 13, bus1, bus2)
-#print("Transformer per unit values:")
-#tx1.show_params()
-
-#bundling1 = Geometry(12.5, 12.5, 20, 1, 3)
-#Finch = Conductor(0.0435, 0.0969, 1.293, bundling1)
-#line1 = TransmissionLine(100, Finch, bus1, bus2)
-#print("Transmission line per unit values:")
-#line1.show_pu_values()
 
 
 

@@ -7,13 +7,15 @@ import pandas as pd
 
 class TransmissionLine:
 
-    def __init__(self, line_length, conductor: Conductor, busA: Bus, busB: Bus): #add name
+    def __init__(self, name, line_length, conductor: Conductor, busA: Bus, busB: Bus): #add name
         self.line_length = line_length
         self.conductor = conductor
         self.busA = busA
         self.busB = busB
         self.y_bus = np.zeros(2)
         self.buses = [self.busA, self.busB]
+        self.name = name
+        self.current = None
         self.__calc_params()
 
     def __calc_params(self):
@@ -59,6 +61,9 @@ class TransmissionLine:
 
     def get_bus_admittance(self):
         return self.y_bus
+
+    def set_line_current(self, current):
+        self.current = current
 
     def show_pu_values(self):
         print("R = ", np.real(self.get_Z_pu()), "pu")

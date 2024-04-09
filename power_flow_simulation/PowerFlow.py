@@ -41,11 +41,11 @@ class PowerFlow:
     def add_geometry(self, name, d_ab, d_bc, d_ca, conductor_distance, num_conductors):
         self.geometry[name] = Geometry(d_ab, d_bc, d_ca, conductor_distance, num_conductors)
 
-    def add_conductor(self, name, GMR, R_c, d_conductor, geometry_name: str):
-        self.conductors[name] = Conductor(GMR, R_c, d_conductor, self.geometry[geometry_name])
+    def add_conductor(self, name, GMR, R_c, d_conductor, current_limit, geometry_name: str):
+        self.conductors[name] = Conductor(GMR, R_c, d_conductor, current_limit, self.geometry[geometry_name])
 
     def add_transmissionLine(self, name, line_length, conductor_name: str, busA: str, busB: str):
-        self.transmissionLines[name] = TransmissionLine(line_length, self.conductors[conductor_name], self.buses[busA],
+        self.transmissionLines[name] = TransmissionLine(name, line_length, self.conductors[conductor_name], self.buses[busA],
                                                         self.buses[busB])
 
     def add_generator(self, name: str, bus: str, P=s.S_mva):
@@ -408,8 +408,11 @@ class PowerFlow:
                     v_solution[a] = np.rad2deg(self.buses[k].v_angle)
                     v_solution[a + len(self.buses)] = self.buses[k].v_mag
                     a += 1
-                print(v_solution)
-                break
+                a = 0
+                v_solution = pd.DataFrame(data=np.zeros(len(self.buses)), index=self.buses, dtype=complex)
+                for k in self.buses:
+                    v_solution.loc[k] = self.buses[k].v_mag * np.exp(1j*self.buses[k].v_angle)
+                return v_solution
             J1 = self.calc_j1(V)
             J2 = self.calc_j2(V)
             J3 = self.calc_j3(V)
@@ -417,8 +420,61 @@ class PowerFlow:
             J = self.calc_jacobian(J1, J2, J3, J4)
             V = self.calc_solution(y, J)
 
-        print("hi")
+    def calc_line_currents(self, V):
+        for x in self.transmissionLines:
+            self.transmissionLines[x].set_line_current(np.abs(V.loc[self.transmissionLines[x].busA.name, 0] * self.transmissionLines[x].y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busA.name] + V.loc[self.transmissionLines[x].busB.name, 0] * self.transmissionLines[x].y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busB.name]))
+            #self.transmissionLines[x].set_line_current(np.abs((V.loc[self.transmissionLines[x].busA.name, 0] - V.loc[self.transmissionLines[x].busB.name, 0]) * self.transmissionLines[x].y_bus.loc[self.transmissionLines[x].busA.name, self.transmissionLines[x].busA.name]))
+            if self.transmissionLines[x].conductor.current_limit <= self.transmissionLines[x].current:
+                print("WARNING: " + self.transmissionLines[x].name + " EXCEEDS AMPACITY LIMIT")
+
+    def calc_power_flow(self, V):
+        size = (len(self.buses), 2)
+        d = np.zeros(size)
+        i = 0
+        bus_names = ['']
+        for x in self.buses:
+            bus_names.append(self.buses[x].name)
+            i += 1
+        bus_names.remove('')
 
 
+        f_calc = pd.DataFrame(data=d, index=bus_names, columns=["P", "Q"], dtype=float)
+        # start calculating real power
+        k = 0
+        for a in self.buses:
+            n = 0
+            temp = 0
+            for b in self.buses:
+                temp += np.abs(self.final_y_bus.loc[a, b]) * np.abs(V.loc[self.buses[b].name, 0]) * np.cos(
+                    np.angle(V.loc[self.buses[a].name, 0]) - np.angle(V.loc[self.buses[b].name, 0]) - np.angle(self.final_y_bus.loc[a, b]))
+                n += 1
+            f_calc.loc[a, "P"] = np.abs(V.loc[self.buses[a].name, 0]) * temp
+            k += 1
+        # calc for vars
+        k = 0
+        for a in self.buses:
+            n = 0
+            temp = 0
+            for b in self.buses:
+                temp += np.abs(self.final_y_bus.loc[a, b]) * np.abs(V.loc[self.buses[b].name, 0]) * np.sin(
+                    np.angle(V.loc[self.buses[a].name, 0]) - np.angle(V.loc[self.buses[b].name, 0]) - np.angle(
+                        self.final_y_bus.loc[a, b]))
+                n += 1
+            f_calc.loc[a, "Q"] = np.abs(V.loc[self.buses[a].name, 0]) * temp
+            k += 1
+        return f_calc
 
-
+    def calc_line_losses(self):
+        d = np.zeros(len(self.transmissionLines))
+        tline_names = ['']
+        i = 0
+        for x in self.transmissionLines:
+            tline_names.append(self.transmissionLines[x].name)
+            i += 1
+        tline_names.remove('')
+        losses = pd.DataFrame(data=d, index=tline_names)
+        a = 0
+        for x in self.transmissionLines:
+            losses.loc[x] = self.transmissionLines[x].current ** 2 * np.real(self.transmissionLines[x].get_Z_pu())
+            a += 1
+        return losses * s.S_mva

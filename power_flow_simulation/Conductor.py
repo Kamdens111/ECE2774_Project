@@ -5,7 +5,7 @@ import sys
 
 class Conductor:
 
-    def __init__(self, GMR, R_c, d_conductor, geometry: Geometry):
+    def __init__(self, GMR, R_c, d_conductor, current_limit, geometry: Geometry):
         self.GMR = GMR
         self.R_c = R_c
         self.d_conductor = d_conductor
@@ -14,6 +14,7 @@ class Conductor:
         self.num_conductors = geometry.num_conductors
         self.D_sl = 0
         self.D_sc = 0
+        self.current_limit = current_limit * geometry.num_conductors
         self.__calc_params()
 
     def __calc_params(self):

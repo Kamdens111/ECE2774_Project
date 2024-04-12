@@ -27,8 +27,8 @@ sim1.add_transmissionLine("tline6", 35, "Partridge", "bus4", "bus5")
 #add transformer
 sim1.add_transformer("T2", 200e6, 10.5, 12, "bus6", "bus7")
 
-sim1.add_generator("G1", "bus1")
-sim1.add_generator("G2", "bus7", 200e6)
+sim1.add_generator("G1", "bus1", 0.12)
+sim1.add_generator("G2", "bus7", 0.12, 200e6)
 
 sim1.add_load("load1", "bus2", 0, 0)
 sim1.add_load("load2", "bus3", 110e6, 50e6)
@@ -36,11 +36,12 @@ sim1.add_load("load3", "bus4", 100e6, 70e6)
 sim1.add_load("load4", "bus5", 100e6, 65e6)
 sim1.add_load("load5", "bus6", 0, 0)
 
-V = sim1.simulate()
-sim1.calc_line_currents(V)
-flow = sim1.calc_power_flow(V) * s.S_mva
-line_losses = sim1.calc_line_losses()
-total_losses = sum(line_losses.to_numpy())
+#V = sim1.simulate_powerflow()
+#sim1.calc_line_currents(V)
+#flow = sim1.calc_power_flow(V) * s.S_mva
+#line_losses = sim1.calc_line_losses()
+#total_losses = sum(line_losses.to_numpy())
+sim1.simulate_fault("bus3")
 
 
 

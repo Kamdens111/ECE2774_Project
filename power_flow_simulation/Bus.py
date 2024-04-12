@@ -17,6 +17,7 @@ class Bus:
         self.bus_number = Bus.bus_count
         self.bus_type = bus_type
         self.v_mag = v_mag
+        self.v_angle = 0
 
         #self.v_mag = None
         #self.v_angle = None

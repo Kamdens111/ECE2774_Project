@@ -48,8 +48,8 @@ class PowerFlow:
         self.transmissionLines[name] = TransmissionLine(name, line_length, self.conductors[conductor_name], self.buses[busA],
                                                         self.buses[busB])
 
-    def add_generator(self, name: str, bus: str, P=s.S_mva):
-        self.generators[name] = Generator(name, bus, P)
+    def add_generator(self, name: str, bus: str, X1, P=s.S_mva):
+        self.generators[name] = Generator(name, bus, X1, P)
 
     def add_load(self, name: str, bus: str, P, Q):
         self.loads[name] = Load(name, bus, P, Q)
@@ -362,7 +362,6 @@ class PowerFlow:
             k += 1
         return J4.to_numpy()
 
-
     def calc_jacobian(self, J1, J2, J3, J4):
         iterator = 0
         slack_position: List[int] = list()
@@ -378,10 +377,7 @@ class PowerFlow:
         J = np.vstack([j12, j23])
         return J
 
-
-
-
-    def simulate(self):
+    def simulate_powerflow(self):
         self.get_y_bus()
         #initialize bus voltages to 1<0 deg
         V = pd.array(data=np.zeros(len(self.buses)), dtype=complex)
@@ -478,3 +474,229 @@ class PowerFlow:
             losses.loc[x] = self.transmissionLines[x].current ** 2 * np.real(self.transmissionLines[x].get_Z_pu())
             a += 1
         return losses * s.S_mva
+
+    def get_z_bus(self):
+        self.get_y_bus()
+        self.final_b_bus = self.final_y_bus
+        for x in self.generators.keys():
+            self.final_b_bus.loc[self.generators[x].bus, self.generators[x].bus] = self.final_y_bus.loc[self.generators[x].bus, self.generators[x].bus] + 1/(1j*self.generators[x].X1)
+
+        self.final_z_bus = pd.DataFrame(data=np.linalg.inv(self.final_b_bus), index=self.final_y_bus.index, columns=self.final_y_bus.columns)
+
+
+    def calc_j1_fault(self, V):
+        size = (len(self.buses) - 1, len(self.buses) - 1)
+        d = np.zeros(size)
+        J1 = pd.DataFrame(data=d, dtype=float)
+        # determine which is slack bus
+
+        slack_position = 0
+        for c in self.buses:
+            if self.buses[c].bus_type == "slack":
+                break
+            slack_position += 1
+        k = 0
+        skip_k = 0
+        for a in self.buses:
+            if self.buses[a].bus_number == slack_position:
+                continue
+            n = 0
+            for b in self.buses:
+                if self.buses[b].bus_number == slack_position:
+                    continue
+                if k != n:
+                    J1.loc[k, n] = (np.abs(V[k]) * np.abs(self.final_b_bus.loc[a, b]) * np.abs(V[n])
+                                    * np.sin(np.angle(V[k]) - np.angle(V[n])
+                                             - np.angle(self.final_b_bus.loc[a, b])))
+
+                else:
+                    temp: float = 0
+                    q = 0
+                    for p in self.buses:
+
+                        if self.buses[p].bus_number == k+1:
+                            q += 1
+                            continue
+                        temp += np.abs(self.final_b_bus.loc[a, p]) * np.abs(V[q]) * np.sin(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_b_bus.loc[a, p]))
+                        q += 1
+                    J1.loc[k, n] = -1 * np.abs(V[k]) * temp
+                n += 1
+
+            k += 1
+        return J1.to_numpy()
+
+    def calc_j2_fault(self, V):
+
+        # determine which is slack bus
+        iterator = 0
+        slack_position: List[int] = list()
+        pv_positions: List[int] = list()
+        for c in self.buses:
+            if self.buses[c].bus_type == "slack":
+                slack_position.extend([iterator])
+            elif self.buses[c].bus_type == "PV":
+                pv_positions.extend([iterator])
+            iterator += 1
+
+        size = (len(self.buses) - 1, len(self.buses) - 1 - len(pv_positions))
+        d = np.zeros(size)
+        J2 = pd.DataFrame(data=d, dtype=float)
+        k = 0
+        skip_k = 0
+        for a in self.buses:
+            if self.buses[a].bus_number in slack_position:
+                skip_k += 1
+                continue
+            n = 0
+            skip_n = 0
+            for b in self.buses:
+                if self.buses[b].bus_number in slack_position or self.buses[b].bus_number in pv_positions:
+                    skip_n += 1
+                    continue
+                if k != n:
+                    J2.loc[k, n] = np.abs(V[k]) * np.abs(self.final_b_bus.loc[a, b]) * np.cos(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_b_bus.loc[a, b]))
+
+                else:
+                    temp: float = 0
+                    q = 0
+                    for p in self.buses:
+                        temp += np.abs(self.final_b_bus.loc[a, p]) * np.abs(V[q]) * np.cos(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_b_bus.loc[a, p]))
+                        q += 1
+                    J2.loc[k, n] = np.abs(V[k]) * np.abs(self.final_b_bus.loc[a, a]) * np.cos(np.angle(self.final_b_bus.loc[a, a])) + temp
+                n += 1
+
+            k += 1
+        return J2.to_numpy()
+
+    def calc_j3_fault(self, V):
+        # determine which is slack bus
+        iterator = 0
+        slack_position: List[int] = list()
+        pv_positions: List[int] = list()
+        for c in self.buses:
+            if self.buses[c].bus_type == "slack":
+                slack_position.extend([iterator])
+            elif self.buses[c].bus_type == "PV":
+                pv_positions.extend([iterator])
+            iterator += 1
+
+        size = (len(self.buses) - 1 - len(pv_positions), len(self.buses) - 1)
+        d = np.zeros(size)
+        J3 = pd.DataFrame(data=d, dtype=float)
+
+        k = 0
+
+        for a in self.buses:
+            if self.buses[a].bus_number in slack_position or self.buses[a].bus_number in pv_positions:
+                continue
+            n = 0
+            for b in self.buses:
+                if self.buses[b].bus_number in slack_position:
+                    continue
+                if k != n:
+                    J3.loc[k, n] = -1 * np.abs(V[k]) * np.abs(self.final_b_bus.loc[a, b]) * np.abs(V[n]) * np.cos(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_b_bus.loc[a, b]))
+
+                else:
+                    temp: float = 0
+                    q = 0
+                    for p in self.buses:
+                        if self.buses[p].bus_number == k+1:
+                            q += 1
+                            continue
+                        temp += np.abs(self.final_b_bus.loc[a, p]) * np.abs(V[q]) * np.cos(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_b_bus.loc[a, p]))
+                        q += 1
+                    J3.loc[k, n] = np.abs(V[k]) * temp
+                n += 1
+
+            k += 1
+
+        return J3.to_numpy()
+
+    def calc_j4_fault(self, V):
+        # determine which is slack bus
+        iterator = 0
+        slack_position: List[int] = list()
+        pv_positions: List[int] = list()
+        for c in self.buses:
+            if self.buses[c].bus_type == "slack":
+                slack_position.extend([iterator])
+            elif self.buses[c].bus_type == "PV":
+                pv_positions.extend([iterator])
+            iterator += 1
+
+        size = (len(self.buses) - 1 - len(pv_positions), len(self.buses) - 1 - len(pv_positions))
+        d = np.zeros(size)
+        J4 = pd.DataFrame(data=d, dtype=float)
+        k = 0
+        for a in self.buses:
+            if self.buses[a].bus_number in slack_position or self.buses[a].bus_number in pv_positions:
+                continue
+            n = 0
+            for b in self.buses:
+                if self.buses[b].bus_number in slack_position or self.buses[b].bus_number in pv_positions:
+                    continue
+                if k != n:
+                    J4.loc[k, n] = np.abs(V[k]) * np.abs(self.final_b_bus.loc[a, b]) * np.sin(np.angle(V[k]) - np.angle(V[n]) - np.angle(self.final_b_bus.loc[a, b]))
+
+                else:
+                    temp: float = 0
+                    q = 0
+                    for p in self.buses:
+                        temp += np.abs(self.final_b_bus.loc[a, p]) * np.abs(V[q]) * np.sin(np.angle(V[k]) - np.angle(V[q]) - np.angle(self.final_b_bus.loc[a, p]))
+                        q += 1
+                    J4.loc[k, n] = -1 * np.abs(V[k]) * np.abs(self.final_b_bus.loc[a, a]) * np.sin(np.angle(self.final_b_bus.loc[a, a])) + temp
+                n += 1
+
+            k += 1
+        return J4.to_numpy()
+
+    def simulate_fault(self, busName: str):
+        self.get_z_bus()
+        If = np.abs(self.buses[busName].v_mag * np.exp(1j*self.buses[busName].v_angle) / self.final_z_bus.loc[busName, busName])
+        I: Dict[str, float] = dict()
+        for i in self.buses:
+            I[self.buses[i].name] = 0
+        I[busName] = If
+        print(busName + " fault current: " + str(If) + "pu")
+
+        V = pd.array(data=np.zeros(len(self.buses)), dtype=complex)
+        a = 0
+        for i in self.buses:
+            if self.buses[i].bus_type != "slack" and self.buses[i].bus_type != "PV":
+                self.buses[i].set_bus_voltage_mag(1)
+            self.buses[i].set_bus_voltage_angle(0)
+            V[a] = self.buses[i].v_mag * np.exp(1j * self.buses[i].v_angle)
+            a += 1
+
+        # simulate voltages and return voltage
+        tolerance = 0.0001
+        for i in range(500):
+            y = self.calc_mismatch(V)
+            count = 0
+            for k in range(len(y)):
+                if np.abs(y[k]) <= tolerance:
+                    count += 1
+            if count == len(y) or i == 49:
+                # create solution vector
+                print("Solution found")
+                v_solution = pd.array(data=np.zeros(len(self.buses) * 2))
+                a = 0
+                for k in self.buses:
+                    v_solution[a] = np.rad2deg(self.buses[k].v_angle)
+                    v_solution[a + len(self.buses)] = self.buses[k].v_mag
+                    a += 1
+                a = 0
+                v_solution = pd.DataFrame(data=np.zeros(len(self.buses)), index=self.buses, dtype=complex)
+                for k in self.buses:
+                    v_solution.loc[k] = self.buses[k].v_mag * np.exp(1j * self.buses[k].v_angle)
+                print(v_solution)
+                return v_solution
+            J1 = self.calc_j1_fault(V)
+            J2 = self.calc_j2_fault(V)
+            J3 = self.calc_j3_fault(V)
+            J4 = self.calc_j4_fault(V)
+            J = self.calc_jacobian(J1, J2, J3, J4)
+            V = self.calc_solution(y, J)
+
+        return V
+    
